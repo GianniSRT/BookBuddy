@@ -1,9 +1,9 @@
 const express = require('express');
-const Book = require('../models/Book');
+const Book = require('../models/book');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ton_secret_jwt_ici'; // Remplace avec ta vraie clé
+const JWT_SECRET = process.env.JWT_SECRET || 'ton_secret_jwt_ici';
 
 // Middleware d'authentification JWT
 function authMiddleware(req, res, next) {
@@ -30,7 +30,7 @@ router.get('/', authMiddleware, async (req, res) => {
 
     if (status) filter.status = status;
     if (favorite === 'true') filter.favorite = true;
-    if (author) filter.author = new RegExp(author, 'i'); // recherche insensible à la casse
+    if (author) filter.author = new RegExp(author, 'i');
     if (category) filter.category = category;
     if (title) filter.title = new RegExp(title, 'i');
 
@@ -38,6 +38,17 @@ router.get('/', authMiddleware, async (req, res) => {
     res.json(books);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// [GET] Détails d'un livre
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const book = await Book.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!book) return res.status(404).json({ error: 'Livre non trouvé' });
+    res.json(book);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
 });
 
@@ -57,7 +68,7 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// [PUT] Modifier un livre (ex: titre, auteur, catégorie, etc.)
+// [PUT] Modifier un livre
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const book = await Book.findOneAndUpdate(
@@ -81,31 +92,11 @@ router.put('/:id/progress', authMiddleware, async (req, res) => {
 
     const book = await Book.findOne({ _id: req.params.id, userId: req.user.id });
     if (!book) return res.status(404).json({ error: 'Livre non trouvé' });
-    if (lastPageRead > book.pages)
+    if (lastPageRead > book.pages) {
       return res.status(400).json({ error: "La dernière page lue ne peut pas dépasser le nombre total de pages." });
-
+    }
     book.lastPageRead = lastPageRead;
     await book.save();
-    res.json(book);
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
-// [PUT] Modifier l'état de lecture (ex: à lire, en cours, terminé)
-router.put('/:id/status', authMiddleware, async (req, res) => {
-  try {
-    const { status } = req.body;
-    const validStatuses = ['à lire', 'en cours de lecture', 'terminé'];
-    if (!validStatuses.includes(status))
-      return res.status(400).json({ error: 'Statut invalide' });
-
-    const book = await Book.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { status },
-      { new: true }
-    );
-    if (!book) return res.status(404).json({ error: 'Livre non trouvé' });
     res.json(book);
   } catch (e) {
     res.status(400).json({ error: e.message });
